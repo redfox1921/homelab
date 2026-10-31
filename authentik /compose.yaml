@@ -1,0 +1,71 @@
+services:
+  postgresql:
+    image: docker.io/library/postgres:16-alpine
+    container_name: authentik-postgres
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 5s
+    volumes:
+      - /volume1/docker/authentik/database:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_DB=${POSTGRES_DB}
+    env_file:
+      - .env
+    networks:
+      - npm-net
+
+  server:
+    image: ghcr.io/goauthentik/server:2026.8.5
+    container_name: authentik-server
+    restart: unless-stopped
+    command: server
+    environment:
+      - AUTHENTIK_POSTGRESQL__HOST=authentik-postgres
+      - AUTHENTIK_POSTGRESQL__USER=${POSTGRES_USER}
+      - AUTHENTIK_POSTGRESQL__NAME=${POSTGRES_DB}
+      - AUTHENTIK_POSTGRESQL__PASSWORD=${POSTGRES_PASSWORD}
+      - AUTHENTIK_SECRET_KEY=${AUTHENTIK_SECRET_KEY}
+    volumes:
+      - /volume1/docker/authentik/media:/media
+      - /volume1/docker/authentik/custom-templates:/templates
+    env_file:
+      - .env
+    depends_on:
+      - postgresql
+    networks:
+      - npm-net
+    # Kein Port-Mapping nötig: NPM erreicht den Server intern über
+    # http://authentik-server:9000 (oder https://authentik-server:9443)
+
+  worker:
+    image: ghcr.io/goauthentik/server:2026.8.5
+    container_name: authentik-worker
+    restart: unless-stopped
+    command: worker
+    environment:
+      - AUTHENTIK_POSTGRESQL__HOST=authentik-postgres
+      - AUTHENTIK_POSTGRESQL__USER=${POSTGRES_USER}
+      - AUTHENTIK_POSTGRESQL__NAME=${POSTGRES_DB}
+      - AUTHENTIK_POSTGRESQL__PASSWORD=${POSTGRES_PASSWORD}
+      - AUTHENTIK_SECRET_KEY=${AUTHENTIK_SECRET_KEY}
+    user: root
+    volumes:
+      - /volume1/docker/authentik/media:/media
+      - /volume1/docker/authentik/certs:/certs
+      - /volume1/docker/authentik/custom-templates:/templates
+    env_file:
+      - .env
+    depends_on:
+      - postgresql
+    networks:
+      - npm-net
+
+networks:
+  npm-net:
+    external: true
