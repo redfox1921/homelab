@@ -1,0 +1,23 @@
+services:
+  pocket-id:
+    container_name: pocket-id
+    image: pocketid/pocket-id:v2
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - 1411:1411
+    volumes:
+      - "./data:/app/data"
+    networks:
+      - npm-net
+    # Optional healthcheck
+    healthcheck:
+      test: [ "CMD", "/app/pocket-id", "healthcheck" ]
+      interval: 1m30s
+      timeout: 5s
+      retries: 2
+      start_period: 10s
+
+networks:
+  npm-net:
+    external: true
